@@ -8,30 +8,26 @@ import AWS from 'aws-sdk';
 class App extends Component {
   state = {
     s3: null,
-    buckets: [],
+    objects: [],
   };
 
   assumeRoleCallback = (err, data) => {
     if (err) {
+      console.log('assumeRoleCallback :: There was an error assuming role...');
       console.log(err);
       return;
     }
-
-    console.log(data);
 
     const { Credentials: { AccessKeyId, SecretAccessKey, SessionToken }} = data;
     const opts = {
       accessKeyId: AccessKeyId,
       secretAccessKey: SecretAccessKey,
       sessionToken: SessionToken,
+      region: process.env.REACT_APP_AWS_REGION,
     };
 
-    console.log(opts);
-
     const s3 = new AWS.S3(opts);
-    console.log(s3);
-    s3.listBuckets({}, this.listBucketsCallback);
-    this.setState({ s3 });
+    this.setState({ s3 }, () => this.listObjects());
   }
 
   loggedIntoFb = (response) => {
@@ -47,26 +43,27 @@ class App extends Component {
 
     sts.assumeRoleWithWebIdentity(params, this.assumeRoleCallback);
   }
-  
-  listBucketsCallback = (err, data) => {
+
+  listObjectsCallback = (err, data) => {
     if (err) {
-      console.log('listBucketsCallback :: There was an error listing buckets.');
+      console.log('listObjectsCallback :: There was an error listing objects.');
       console.log(err);
       return;
     }
 
-    const { Buckets: buckets } = data;
-    console.log(buckets);
-    this.setState({ buckets });
+    this.setState({ objects: data.Contents });
   }
 
-  listBuckets = (ev) => {
+  listObjects = (ev) => {
     if (ev) {
       ev.preventDefault(); // In case we get click event.
     }
 
     const { s3 } = this.state;
-    s3.listBuckets({}, this.listBucketsCallback);
+
+    s3.listObjectsV2({
+      Bucket: process.env.REACT_APP_BUCKET,
+    }, this.listObjectsCallback);
   }
 
   renderFb() {
@@ -82,11 +79,15 @@ class App extends Component {
   }
 
   renderBuckets() {
-    const { buckets } = this.state;
+    const { objects, bucketName } = this.state;
     return (
       <div className="App-intro">
-        <a href="#" onClick={this.listBuckets}> Reload Buckets </a>
-        { buckets.map(bucket => console.log(bucket)) }
+        <h3> You have been connected to a bucket! </h3>
+        <a href="#" onClick={this.listObjects}> Reload Bucket Content </a>
+        <h4> Contents are listed bellow </h4>
+        {objects.map(bucketItem => (
+          <p key={bucketItem.Key}>{bucketItem.Key}</p>
+        ))}
       </div>
     )
   }
